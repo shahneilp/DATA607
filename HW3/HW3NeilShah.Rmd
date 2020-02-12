@@ -406,12 +406,12 @@ str_view('church', "(..).*\\1")
 **Contain one letter repeated in at least three places (e.g. “eleven” contains three “e”s.)** <br>
 
 ```
- str_view('eleven', "([a-z]).*\\1.*\\1")
+ str_view('eleven', "([a-z]).*\\1.*\\1*")
  
  ```
- **elev**en
+ **eleven**
 
-Here we use the [a-z] to get all chraracters, the .* for everything after, and the \\1 (twice) to match it two more times. 
+Here we use the [a-z] to get all chraracters, the .* for everything after, and the \\1 (twice) to match it two more times, the * to catch everything else. 
 
 *** 
 

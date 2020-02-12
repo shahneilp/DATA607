@@ -395,11 +395,11 @@ The ^ and $ to anchor it to the entire string, the .* to capture everything, and
 **Contain a repeated pair of letters (e.g. “church” contains “ch” repeated twice.)** <br>
 
 ```
-str_view('church', "(..).*\\1")
+str_view('church','([A-Za-z][A-Za-z]).*\\1')
 
 ```
 
-(..) for the two wildcards we want the match, the .* for everything else, and then the \\1 to match the initial (..) again.
+[A-za-z] twice for the two letters we want the match, the .* for everything else, and then the \\1 to match the initial two letters again.
 
 *** 
 

@@ -57,52 +57,47 @@ data(head)
 2) Hyphen separating rows that I can safely eliminate.
 3) The pertinent data starts on line 5
 4) Player data is every 3rd line
+5)
 
 Furthermore:
 
-1) ID are stored as an 8 digit number
-2) Total pts are a two digit float
-3) States are two capital letter preceded/followed by a white space
+
+1) Total pts are a two digit float
+2) States are two capital letter preceded/followed by a white space
 4) Names are all capital letters with whitespace--they are precded by numbers.
 5) Pre-scores can be a 3-4 digit number and includea P--they come after a R: and before a ->
 6) Each row is 89 characters
 7) The player schedule is the opponents rank but can also include games not played. 
+8) There are up to 7 rounds for each player. 
 
 I will exploit these formatting to create reg-ex to pull said values and create vectors.
 
 
 ## Initial RegEx 
 
-1) IDs are 8 digit numbers without any white space--this expression in regex is the following:
 
-```
-idregex <- "[0-9]{8}"
 
-```
-
-Matching exactly an 8 digit number
-
-2) Total pts are two digit number with floats (decimal) place
+1) Total pts are two digit number with floats (decimal) place
 
 ```
 pointsregex <- "\\d\\.\\d"
 
 ```
 
-3) Matching the states--capital letters preceded by a white space on the start of a string with exactly 2 characters.
+2) Matching the states--capital letters preceded by a white space on the start of a string with exactly 2 characters.
 
 ```
 stateregex <- "^\\s+[A-Z]{2}"
 
 ```
 
-4) Names are capital strings, at least two characters with white space and preceeded by a number and bar |. 
+3) Names are capital strings, at least two characters with white space and preceeded by a number and bar |. 
 
 ```
 nameregex <- '[0-9] \\| ([A-Z]+\\s){2,}'
 
 ```
-5) Scores are 3-4 digit number with possible P string--but are preceeded by a R:
+4) Scores are 3-4 digit number with possible P string--but are preceeded by a R:
 
 ```
 scoreregex <- "R:\\s*([0-9P]+){1,}"
@@ -118,7 +113,6 @@ Using the regex expressions I can make column vectors with our data.
 states <- unlist(str_extract_all(unlist(data), stateregex)) 
 names <- unlist(str_extract_all(unlist(data), nameregex))
 points <- unlist(str_extract_all(unlist(data), pointsregex))
-ids <- unlist(str_extract_all(unlist(data), idregex))
 scores <-unlist(str_extract_all(unlist(data), scoreregex))
 
 ```
@@ -137,8 +131,7 @@ Let's just check our columns
 [1] "6.0" "6.0"
 > head(scores,2)
 [1] "R: 1794" "R: 1553"
-> head(ids,2)
-[1] "15445895" "14598900
+
 
 ```
 Let's remove the whitespace from states, the RL from scores and the number | from names.
@@ -180,14 +173,13 @@ If we pulled this data correctly they should all have the same entries/lenght
 
 ## Assembling the data frame. 
 
-Note: I included ID even though project isn't asking it
 
 ```
-chessdf <- data.frame(names,states,ids,points,scores)
+chessdf <- data.frame(names,states,points,scores)
 > head(chessdf)
-                 names states      ids points scores
-1            GARY HUA      ON 15445895    6.0   1794
-2     DAKSHESH DARURI      MI 14598900    6.0   1553
+                 names states  points scores
+1            GARY HUA      ON     6.0   1794
+2     DAKSHESH DARURI      MI     6.0   1553
 
 ```
 
@@ -197,7 +189,7 @@ The opponent played is a series of up to 7 entries, delineated by the rank of an
 
 Going through the data--the values of the game out come can be W,L,D,H,U,X,B. Some of these have numbers (meaning a game was played) and some are blank [B,U,D,H,X]. To complicate things the line after each row also contains W,B with blanks.
 
-I noticed that the only data I needed was from each player row so I sliced the data and did an initial regex to find everything between |
+I noticed that the only data I needed was from each player row so I sliced the data and did an initial regex to find everything between the characters and |.
 
 
 
@@ -304,71 +296,71 @@ chessdf$postscore <-floor((rowSums(opp[1:7])/(7-opp$Count)))
 
 ```
 > chessdf
-                       names states      ids points scores postscore
-1                  GARY HUA      ON 15445895    6.0   1794      1605
-2           DAKSHESH DARURI      MI 14598900    6.0   1553      1469
-3              ADITYA BAJAJ      MI 14959604    6.0   1384      1563
-4       PATRICK H SCHILLING      MI 12616049    5.5   1716      1573
-5                HANSHI ZUO      MI 14601533    5.5   1655      1500
-6               HANSEN SONG      OH 15055204    5.0   1686      1518
-7         GARY DEE SWATHELL      MI 11146376    5.0   1649      1372
-8          EZEKIEL HOUGHTON      MI 15142253    5.0   1641      1468
-9               STEFANO LEE      ON 14954524    5.0   1411      1523
-10                ANVIT RAO      MI 14150362    5.0   1365      1554
-11 CAMERON WILLIAM MC LEMAN      MI 12581589    4.5   1712      1467
-12           KENNETH J TACK      MI 12681257    4.5   1663      1506
-13        TORRANCE HENRY JR      MI 15082995    4.5   1666      1497
-14             BRADLEY SHAW      MI 10131499    4.5   1610      1515
-15   ZACHARY JAMES HOUGHTON      MI 15619130    4.5   1220      1483
-16             MIKE NIKITIN      MI 10295068    4.0   1604      1385
-17       RONALD GRZEGORCZYK      MI 10297702    4.0   1629      1498
-18            DAVID SUNDEEN      MI 11342094    4.0   1600      1480
-19             DIPANKAR ROY      MI 14862333    4.0   1564      1426
-20              JASON ZHENG      MI 14529060    4.0   1595      1410
-21            DINH DANG BUI      ON 15495066    4.0   1563      1470
-22         EUGENE L MCCLURE      MI 12405534    4.0   1555      1300
-23                 ALAN BUI      ON 15030142    4.0   1363      1213
-24        MICHAEL R ALDRICH      MI 13469010    4.0   1229      1357
-25         LOREN SCHWIEBERT      MI 12486656    3.5   1745      1363
-26                  MAX ZHU      ON 15131520    3.5   1579      1506
-27           GAURAV GIDWANI      MI 14476567    3.5   1552      1221
-28              SOFIA ADINA      MI 14882954    3.5   1507      1522
-29         CHIEDOZIE OKORIE      MI 15323285    3.5   1602      1313
-30       GEORGE AVERY JONES      ON 12577178    3.5   1522      1144
-31             RISHI SHETTY      MI 15131618    3.5   1494      1259
-32    JOSHUA PHILIP MATHEWS      ON 14073750    3.5   1441      1378
-33                  JADE GE      MI 14691842    3.5   1449      1276
-34   MICHAEL JEFFERY THOMAS      MI 15051807    3.5   1399      1375
-35         JOSHUA DAVID LEE      MI 14601397    3.5   1438      1149
-36            SIDDHARTH JHA      MI 14773163    3.5   1355      1388
-37     AMIYATOSH PWNANANDAM      MI 15489571    3.5    980      1384
-38                BRIAN LIU      MI 15108523    3.0   1423      1539
-39            JOEL R HENDON      MI 12923035    3.0   1436      1429
-40             FOREST ZHANG      MI 14892710    3.0   1348      1390
-41      KYLE WILLIAM MURPHY      MI 15761443    3.0   1403      1248
-42                 JARED GE      MI 14462326    3.0   1332      1149
-43        ROBERT GLEN VASEY      MI 14101068    3.0   1283      1106
-44       JUSTIN D SCHILLING      MI 15323504    3.0   1199      1327
-45                DEREK YAN      MI 15372807    3.0   1242      1152
-46 JACOB ALEXANDER LAVALLEY      MI 15490981    3.0    377      1357
-47              ERIC WRIGHT      MI 12533115    2.5   1362      1392
-48             DANIEL KHAIN      MI 14369165    2.5   1382      1355
-49         MICHAEL J MARTIN      MI 12531685    2.5   1291      1285
-50               SHIVAM JHA      MI 14773178    2.5   1056      1296
-51           TEJAS AYYAGARI      MI 15205474    2.5   1011      1356
-52                ETHAN GUO      MI 14918803    2.5    935      1494
-53            JOSE C YBARRA      MI 12578849    2.0   1393      1345
-54              LARRY HODGE      MI 12836773    2.0   1270      1206
-55                ALEX KONG      MI 15412571    2.0   1186      1406
-56             MARISA RICCI      MI 14679887    2.0   1153      1414
-57               MICHAEL LU      MI 15113330    2.0   1092      1363
-58             VIRAJ MOHILE      MI 14700365    2.0    917      1391
-59        SEAN M MC CORMICK      MI 12841036    2.0    853      1319
-60               JULIA SHEN      MI 14579262    1.5    967      1330
-61            JEZZEL FARKAS      ON 15771592    1.5    955      1327
-62            ASHWIN BALAJI      MI 15219542    1.0   1530      1186
-63     THOMAS JOSEPH HOSMER      MI 15057092    1.0   1175      1350
-64                   BEN LI      MI 15006561    1.0   1163      1263
+                       names states points scores postscore
+1                  GARY HUA      ON    6.0   1794      1605
+2           DAKSHESH DARURI      MI    6.0   1553      1469
+3              ADITYA BAJAJ      MI    6.0   1384      1563
+4       PATRICK H SCHILLING      MI    5.5   1716      1573
+5                HANSHI ZUO      MI    5.5   1655      1500
+6               HANSEN SONG      OH    5.0   1686      1518
+7         GARY DEE SWATHELL      MI    5.0   1649      1372
+8          EZEKIEL HOUGHTON      MI    5.0   1641      1468
+9               STEFANO LEE      ON    5.0   1411      1523
+10                ANVIT RAO      MI    5.0   1365      1554
+11 CAMERON WILLIAM MC LEMAN      MI    4.5   1712      1467
+12           KENNETH J TACK      MI    4.5   1663      1506
+13        TORRANCE HENRY JR      MI    4.5   1666      1497
+14             BRADLEY SHAW      MI    4.5   1610      1515
+15   ZACHARY JAMES HOUGHTON      MI    4.5   1220      1483
+16             MIKE NIKITIN      MI    4.0   1604      1385
+17       RONALD GRZEGORCZYK      MI    4.0   1629      1498
+18            DAVID SUNDEEN      MI    4.0   1600      1480
+19             DIPANKAR ROY      MI    4.0   1564      1426
+20              JASON ZHENG      MI    4.0   1595      1410
+21            DINH DANG BUI      ON    4.0   1563      1470
+22         EUGENE L MCCLURE      MI    4.0   1555      1300
+23                 ALAN BUI      ON    4.0   1363      1213
+24        MICHAEL R ALDRICH      MI    4.0   1229      1357
+25         LOREN SCHWIEBERT      MI    3.5   1745      1363
+26                  MAX ZHU      ON    3.5   1579      1506
+27           GAURAV GIDWANI      MI    3.5   1552      1221
+28              SOFIA ADINA      MI    3.5   1507      1522
+29         CHIEDOZIE OKORIE      MI    3.5   1602      1313
+30       GEORGE AVERY JONES      ON    3.5   1522      1144
+31             RISHI SHETTY      MI    3.5   1494      1259
+32    JOSHUA PHILIP MATHEWS      ON    3.5   1441      1378
+33                  JADE GE      MI    3.5   1449      1276
+34   MICHAEL JEFFERY THOMAS      MI    3.5   1399      1375
+35         JOSHUA DAVID LEE      MI    3.5   1438      1149
+36            SIDDHARTH JHA      MI    3.5   1355      1388
+37     AMIYATOSH PWNANANDAM      MI    3.5    980      1384
+38                BRIAN LIU      MI    3.0   1423      1539
+39            JOEL R HENDON      MI    3.0   1436      1429
+40             FOREST ZHANG      MI    3.0   1348      1390
+41      KYLE WILLIAM MURPHY      MI    3.0   1403      1248
+42                 JARED GE      MI    3.0   1332      1149
+43        ROBERT GLEN VASEY      MI    3.0   1283      1106
+44       JUSTIN D SCHILLING      MI    3.0   1199      1327
+45                DEREK YAN      MI    3.0   1242      1152
+46 JACOB ALEXANDER LAVALLEY      MI    3.0    377      1357
+47              ERIC WRIGHT      MI    2.5   1362      1392
+48             DANIEL KHAIN      MI    2.5   1382      1355
+49         MICHAEL J MARTIN      MI    2.5   1291      1285
+50               SHIVAM JHA      MI    2.5   1056      1296
+51           TEJAS AYYAGARI      MI    2.5   1011      1356
+52                ETHAN GUO      MI    2.5    935      1494
+53            JOSE C YBARRA      MI    2.0   1393      1345
+54              LARRY HODGE      MI    2.0   1270      1206
+55                ALEX KONG      MI    2.0   1186      1406
+56             MARISA RICCI      MI    2.0   1153      1414
+57               MICHAEL LU      MI    2.0   1092      1363
+58             VIRAJ MOHILE      MI    2.0    917      1391
+59        SEAN M MC CORMICK      MI    2.0    853      1319
+60               JULIA SHEN      MI    1.5    967      1330
+61            JEZZEL FARKAS      ON    1.5    955      1327
+62            ASHWIN BALAJI      MI    1.0   1530      1186
+63     THOMAS JOSEPH HOSMER      MI    1.0   1175      1350
+64                   BEN LI      MI    1.0   1163      1263
 
 ```
 
@@ -389,7 +381,7 @@ Possible improvements <br>
 1. Reading line by line--this would be an optimized solution that would help preventing memory issues for big files.<br>
 2. Exploiting the fixed lengths to quickly make dataframes--most of the data was at the same interval, I chose to use regex instead to make this more scalable. <br>
 3) Better regex--ideally I wouldn't need to post procses my data pulls; I'm sure there are more efficient ways to regex. <br>
-4) Combining code--the use of intermediary datafames was to make my life easier but I could of combined this all in one <br>
+4) Combining code--the use of intermediary datafames was to make my life easier but I could of combined this all in one and create functions.<br>
 
 
 
@@ -398,6 +390,7 @@ Possible improvements <br>
 ## Appendix: Full code
 
 ```
+library('stringr')
 data <- readLines('https://raw.githubusercontent.com/shahneilp/DATA607/master/Project%201/tournamentinfo.txt')
 idregex <- "[0-9]{8}"
 pointsregex <- "\\d\\.\\d"
@@ -407,7 +400,6 @@ scoreregex <- "R:\\s*([0-9P]+){1,}"
 states <- unlist(str_extract_all(unlist(data), stateregex)) 
 names <- unlist(str_extract_all(unlist(data), nameregex))
 points <- unlist(str_extract_all(unlist(data), pointsregex))
-ids <- unlist(str_extract_all(unlist(data), idregex))
 scores <-unlist(str_extract_all(unlist(data), scoreregex))
 scores <-unlist(str_extract_all(unlist(scores), '[0-9]{3,4}')) 
 states <- unlist(str_extract_all(unlist(states), '[A-Z]{2}')) 
@@ -417,7 +409,7 @@ scores <-as.numeric(scores)
 print('Data Validation:')
 print(identical(length(states),length(names),length(points),length(scores)))
 rank <-seq(1,length(names))
-chessdf <- data.frame(names,states,ids,points,scores)
+chessdf <- data.frame(names,states,points,scores)
 dataslice <- data[seq(5,length(data),3)]
 opp <- unlist(str_extract_all(unlist(dataslice), "\\|[WDBDXHLU]\\s\\s(.*)"))
 opp<-str_replace_all(opp,'H','0')

@@ -282,26 +282,20 @@ The resultant is a list--that I unlisted (using unlist) and stored as a  column 
 (.)\1\1
 
 ```
-Nothing--since it doesn't have quotes around it.
-
-If it was '(.)\1\1'
+Would be 
 
 ```
-str_view('a\1\1fnfnf','(.)\1\1'
+  '(.)\\1\\1'
 
 ```
-It would look for a character followed by two escapes. 
 
-If it was 
-
-```
-str_view('aaap', "(.)\\1\\1")
-> 
+This would match a character three times in a row. 
 
 ```
-It would return three of the same wildcard characters in a row
+str_view('abcbbbcaf','(.)\\1\\1')
 
-**aaa**p
+```
+abc**bbb**caf
 
 ***
 
@@ -309,7 +303,7 @@ It would return three of the same wildcard characters in a row
 "(.)(.)\\2\\1"
 ```
 
-This will match two of the same characters (back to back) surrounded by the another pair of character. TWo wild cards (.) followed by the 2nd wild card, then the first wildcard.
+This will match two of the same characters (back to back) surrounded by the another pair of character. TWo wild cards (.) followed by the 2nd wild card, then the first wildcard. Essentially--first charcter, second, followed by second and first character. 
 
 For example; XYYX or POOP
 
@@ -318,9 +312,9 @@ Example:
 > str_view(fruit,"(.)(.)\\2\\1",match=TRUE)
 
 ```
+
 bell p**eppe**r
 chili p**eppe**r
-
 
 *** 
 
@@ -328,21 +322,14 @@ chili p**eppe**r
 (..)\1
 ```
 
-Once again--doens't match anything due to lack of quotes and the \1 (non-escape to grouping).
-
-```
-> str_view(fruit,(..)\1,match=TRUE)
-Error: unexpected input in "str_view(fruit,(..)\"
-
-```
-If it was instead 
+If we put this in quotes it would be:
 
 ```
 "(..)\\1
 str_view(fruits, "(..)\\1")
 
 ```
-It would match two wild cards followed by the pair again.  From the above example it would match
+It would match two wild cards followed by the pair again--basically two characters repeated twice.  From the above example it would match
 
 s**alal** berry 
 
@@ -353,7 +340,7 @@ s**alal** berry
 "(.).\\1.\\1"
 ```
 
-This would extract three of the same wildcard characters with another character in between--for example
+This would extract three of the same wildcard characters with another character in between--for example:
 
 ```
 > str_view('afabacad',"(.).\\1.\\1")
@@ -371,7 +358,7 @@ Extracts **afaba**cad
 '(.)(.)(.).*\\3\\2\\1'
 
 ```
-This will extract an expression that starts off with three wild card characters and ends with the reverse three characters, and whatever is in between them. Three wild cards (.) followed by .* (everything) and then the reverse. (3rd wildcard, 2nd and then 1) 
+This will extract an expression (6 or more characters) that starts off with three wild card characters and ends with the reverse three characters, and whatever is in between them. Three wild cards (.) followed by .* (everything) and then the reverse. (3rd wildcard, 2nd and then 1) 
 
 For example:
 
@@ -413,12 +400,12 @@ str_view('church','([A-Za-z][A-Za-z]).*\\1')
 **Contain one letter repeated in at least three places (e.g. “eleven” contains three “e”s.)** <br>
 
 ```
- str_view('eleven', "([a-z]).*\\1.*\\1*")
+ str_view('eleven', "([A-Za-z]).*\\1.*\\1*")
  
  ```
  **eleven**
 
-Here we use the [a-z] to get all chraracters, the .* for everything after, and the \\1 (twice) to match it two more times, the * to catch everything else. 
+Here we use the a-z to get all chraracters, the .* for everything after, and the \\1 (twice) to match it two more times, the * to catch everything else. 
 
 *** 
 

@@ -1,6 +1,5 @@
 {
-    "Data_Quant_Science_Books": {
-        "book": [
+        "Book": [
             {
         "Title": "Quantitative Finance",
         "Author": "Paul Wilmott",
@@ -20,5 +19,4 @@
 		"Publisher": "O'Reilly"
             }
         ]
-    }
 }

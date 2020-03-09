@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Data_Quant_Science_Books>
     <Book>
         <Title>Quantitative Finance</Title>
         <Author>Paul Wilmott</Author>
@@ -18,4 +17,3 @@
        	<ISBN>9781491910399</ISBN>
         <Publisher>O'Reilly</Publisher>
     </Book>
-</Data_Quant_Science_Books>

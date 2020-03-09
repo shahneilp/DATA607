@@ -1,0 +1,24 @@
+{
+    "Data_Quant_Science_Books": {
+        "book": [
+            {
+        "Title": "Quantitative Finance",
+        "Author": "Paul Wilmott",
+        "ISBN": "90471874388",
+		"Publisher": "Wiley",
+            },
+            {
+		"Title": "Pandas Cookbook",
+		"Author": "Theodore Petrou",
+		"ISBN": "9781784393979",
+		"Publisher": "McGraw Hill",
+            },
+	    {
+		"Title": "R for Data Science",
+		"Author": "Hadley Wickham, Garret Grolemund",
+		"ISBN": "9781491910399",
+		"Publisher": "O'Reilly",
+            }
+        ]
+    }
+}

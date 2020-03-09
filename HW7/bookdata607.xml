@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<Data_Quant_Science_Books>
+    <Book>
+        <Title>Quantitative Finance</Title>
+        <Author>Paul Wilmott</Author>
+        <Author />
+		<ISBN>90471874388</ISBN>
+        <Publisher>Wiley</Publisher>
+    </Book>
+    <Book>
+        <Title>Pandas Cookbook</Title>
+        <Author>Theodore Petrou</Author>
+        <Author />
+		<ISBN>9781784393979</ISBN>
+        <Publisher>McGraw Hill</Publisher>
+    </Book>
+    <Book>
+        <Title>R for Data Science</Title>
+        <Author>Hadley Wickham</Author>
+		<Author>Garret Grolemund</Author>
+       	<ISBN>9781491910399</ISBN>
+        <Publisher>O'Reilly</Publisher>
+    </Book>
+</Data_Quant_Science_Books>

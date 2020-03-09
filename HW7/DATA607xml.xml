@@ -1,22 +1,22 @@
-## <?xml version="1.0" encoding="UTF-8"?>
-## <DataScience_Books>
-##   <Book>
-##     <Title>Quantitative Finance</Title>
-##     <Author>Paul Wilmott</Author>
-##     <Publisher>Wiley</Publisher>
-##     <ISBN>90471874388</ISBN>
-##   </Book>
-##   <Book>
-##     <Title>Think Bayes</Title>
-##     <Author>Allen B Downey</Author>
-##     <Publisher>O'Reilly</Publisher>
-##     <ISBN>9781449370787</ISBN>
-##   </Book>
-##   <Book>
-##     <Title>R for Data Science</Title>
-##     <Author>Hadley Wickham</Author>
-##     <Author>Garret Grolemund</Author>
-##     <Publisher>O'Reilly</Publisher>
-##     <ISBN>9781491910399</ISBN>
-##   </Book>
-## </DataScience_Books>
+<?xml version="1.0" encoding="UTF-8"?>
+ <DataScience_Books>
+<Book>
+<Title>Quantitative Finance</Title>
+<Author>Paul Wilmott</Author>
+<Publisher>Wiley</Publisher>
+<ISBN>90471874388</ISBN>
+</Book>
+<Book>
+<Title>Think Bayes</Title>
+<Author>Allen B Downey</Author>
+<Publisher>O'Reilly</Publisher>
+<ISBN>9781449370787</ISBN>
+</Book>
+<Book>
+<Title>R for Data Science</Title>
+<Author>Hadley Wickham</Author>
+ <Author>Garret Grolemund</Author>
+<Publisher>O'Reilly</Publisher>
+<ISBN>9781491910399</ISBN>
+</Book>
+</DataScience_Books>

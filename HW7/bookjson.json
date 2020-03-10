@@ -14,7 +14,10 @@
             },
 	    {
 		"Title": "R for Data Science",
-		"Author": "Hadley Wickham, Garret Grolemund",
+		"Author":{ 
+				"one": "Hadley Wickham", 
+				"two": "Garret Grolemund"
+				}
 		"ISBN": "9781491910399",
 		"Publisher": "O'Reilly"
             }

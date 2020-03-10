@@ -1,0 +1,244 @@
+---
+title: 'DATA607: Assignment 7: Neil Shah'
+output:
+  html_document:
+    theme: "cerulean"
+    colortheme: "dolphin"
+    fonttheme: "structurebold"
+---
+
+## Introduction
+
+**In this assignment we will import a HTML, XML and JSON file in R! These are all popular mark-up languges used to parse structured data for humans/machine reading.** 
+
+**We will be importing them into datafames and comparing ease and structure!**
+
+
+## Installing Packages
+
+```
+library(jsonlite)
+library(XML)
+library(dplyr)
+library(RCurl)
+```
+
+## XML 
+
+**I used Notepad++ to make an XML file and then uploaded it to my GitHub!**
+
+**Here is the source**
+
+***
+```
+<?xml version="1.0" encoding="UTF-8"?>
+<Books>
+    <Book>
+        <Title>Quantitative Finance</Title>
+        <Author>Paul Wilmott</Author>
+		<ISBN>90471874388</ISBN>
+        <Publisher>Wiley</Publisher>
+    </Book>
+    <Book>
+        <Title>Pandas Cookbook</Title>
+        <Author>Theodore Petrou</Author>
+		<ISBN>9781784393979</ISBN>
+        <Publisher>McGraw Hill</Publisher>
+    </Book>
+    <Book>
+        <Title>R for Data Science</Title>
+        <Author>
+			<a_one>Hadley Wickham</a_one> 
+			<a_two>Garret Grolemund</a_two>
+		</Author>
+       	<ISBN>9781491910399</ISBN>
+        <Publisher>O'Reilly</Publisher>
+    </Book>
+</Books>
+
+
+```
+***
+
+**Now to the R Studio side.** 
+
+```
+>xmlpath <- 'https://raw.githubusercontent.com/shahneilp/DATA607/master/HW7/bookdata607.xml'
+>bookxml <- xmlParse(getURL(xmlpath))
+> xmldf <-xmlToDataFrame(bookxml)
+> xmldf
+```
+
+**Now  it's loaded into a dataframe!**
+
+***
+```
+                 Title                           Author          ISBN   Publisher
+1 Quantitative Finance                     Paul Wilmott   90471874388       Wiley
+2      Pandas Cookbook                  Theodore Petrou 9781784393979 McGraw Hill
+3   R for Data Science Hadley Wickham, Garret Grolemund 9781491910399    O'Reilly
+```
+***
+
+## HTML
+
+**Once again Notepad++ to the rescue**
+
+***
+```
+<!DOCTYPE html>
+<html>
+<body>
+
+<table style="width:100%">
+  <tr>
+    <th>Title</th>
+    <th>Author</th> 
+    <th>ISBN</th>
+	<th>Publisher</th>
+  </tr>
+  <tr>
+    <td>Quantitative Finance</td>
+    <td>Paul Wilmott</td>
+    <td>90471874388</td>
+	<td>Wiley</td>
+  </tr>
+  <tr>
+    <td>Pandas Cookbook</td>
+    <td>Theodore Petrou</td>
+    <td>9781784393979</td>
+	<td>McGraw Hill</td>
+  </tr>
+  <tr>
+    <td>R for Data Science</td>
+    <td>Hadley Wickham, Garret Grolemund</td>
+    <td>9781491910399</td>
+	<td>O'Reilly</td>
+  </tr>
+</table>
+</body>
+</html>
+```
+***
+
+**Now putting it back in the R!**
+
+```
+htmlpath='https://raw.githubusercontent.com/shahneilp/DATA607/master/HW7/book.html'
+> htmldf <-getURL(htmlpath) %>% htmlParse() %>% readHTMLTable()
+```
+**Putting it into a dataframe!**
+
+***
+```
+> htmldf
+$`NULL`
+                 Title                           Author          ISBN   Publisher
+1 Quantitative Finance                     Paul Wilmott   90471874388       Wiley
+2      Pandas Cookbook                  Theodore Petrou 9781784393979 McGraw Hill
+3   R for Data Science Hadley Wickham, Garret Grolemund 9781491910399    O'Reilly
+```
+***
+
+## JSON
+
+**Notepad++ time again!**
+
+```
+{
+        "Book": [
+            {
+        "Title": "Quantitative Finance",
+        "Author": "Paul Wilmott",
+        "ISBN": "90471874388",
+		"Publisher": "Wiley"
+            },
+            {
+		"Title": "Pandas Cookbook",
+		"Author": "Theodore Petrou",
+		"ISBN": "9781784393979",
+		"Publisher": "McGraw Hill"
+            },
+	    {
+		"Title": "R for Data Science",
+		"Author": 
+				{ 
+				"one": "Hadley Wickham", 
+				"two": "Garret Grolemund"
+				},
+		"ISBN": "9781491910399",
+		"Publisher": "O'Reilly"
+            }
+        ]
+}
+```
+
+**Now going to R**
+
+
+```
+jsondf <-fromJSON('https://raw.githubusercontent.com/shahneilp/DATA607/master/HW7/bookjson.json')
+jsondf
+
+```
+**Putting it into a dataframe!**
+
+***
+```
+> jsondf
+$Book
+                 Title                           Author          ISBN   Publisher
+1 Quantitative Finance                     Paul Wilmott   90471874388       Wiley
+2      Pandas Cookbook                  Theodore Petrou 9781784393979 McGraw Hill
+3   R for Data Science Hadley Wickham, Garret Grolemund 9781491910399    O'Reilly
+
+```
+***
+
+
+## Comparison
+
+**Let's look into the list/variables of each dataframe.**
+
+```
+> str(htmldf)
+List of 1
+ $ NULL:'data.frame':	3 obs. of  4 variables:
+  ..$ Title    : Factor w/ 3 levels "Pandas Cookbook",..: 2 1 3
+  ..$ Author   : Factor w/ 3 levels "Hadley Wickham, Garret Grolemund",..: 2 3 1
+  ..$ ISBN     : Factor w/ 3 levels "90471874388",..: 1 3 2
+  ..$ Publisher: Factor w/ 3 levels "McGraw Hill",..: 3 1 2
+
+> str(jsondf)
+List of 1
+ $ Book:'data.frame':	3 obs. of  4 variables:
+  ..$ Title    : chr [1:3] "Quantitative Finance" "Pandas Cookbook" "R for Data Science"
+  ..$ Author   :List of 3
+  .. ..$ : chr "Paul Wilmott"
+  .. ..$ : chr "Theodore Petrou"
+  .. ..$ :List of 2
+  .. .. ..$ one: chr "Hadley Wickham"
+  .. .. ..$ two: chr "Garret Grolemund"
+  ..$ ISBN     : chr [1:3] "90471874388" "9781784393979" "9781491910399"
+  ..$ Publisher: chr [1:3] "Wiley" "McGraw Hill" "O'Reilly"
+
+> str(xmldf)
+'data.frame':	3 obs. of  4 variables:
+ $ Title    : Factor w/ 3 levels "Pandas Cookbook",..: 2 1 3
+ $ Author   : Factor w/ 3 levels "Hadley Wickham, Garret Grolemund",..: 2 3 1
+ $ ISBN     : Factor w/ 3 levels "90471874388",..: 1 3 2
+ $ Publisher: Factor w/ 3 levels "McGraw Hill",..: 3 1 2
+ ```
+## Conclusions
+
+**1. So all three dataframes have the same amount of observations/variables--which should be expected given that they contain identical data.**
+
+**2. However the JSON and HTML seems to store the dataframes within a list while the xmldf is in it's own dataframe.**
+
+**3. Another similiarity between XML and HTML is that they use a multilevel factor data type versus characters for json.**
+
+**4. The JSON actually differentiated between the two different authors [even stored it as a list], while the other formats did not. Furthermore JSON gave a name to the dataframe while the others did not (this could of been due to how I coded it) but still it's interesting--JSON is able to support more advanced nesting/organization hiearchies, which can be useful for database/complicated data formats. **
+
+**5. In terms of steps, JSON was the fasest since it had one command to load it into the dataframe. XML/HTML had to be parsed first before being loaded into a dataframe.**
+
+

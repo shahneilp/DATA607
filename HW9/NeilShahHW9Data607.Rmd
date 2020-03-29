@@ -1,0 +1,172 @@
+---
+title: 'Neil Shah: DATA 607 HW 9'
+output:
+  html_document:
+    df_print: paged
+---
+
+## Intrdouction
+
+The purpose of this notebook is to discuss how to develop a function that can interface with the New York Times API. After reading the [documentation](https://developer.nytimes.com/apis), which is critical to understand any API, I registered for an unique API key and planned on making a dataframe using the described JSON architecture.
+
+## Packages Involved
+
+```{r}
+library(tidyverse)
+library(jsonlite)
+library(DT)
+library(RCurl)
+library(stringr)
+```
+
+## API Use
+
+The NY Times has 12 different APIs as follows:
+
+1. Archive 
+2. Article Search
+3. Books
+4. Community (beta)
+5. Geo
+6. Most Popular
+7. Movie Reviews
+8. RSS Feeds
+9. Semantic 
+10. Times Tag
+11. Timews Wire
+12. Top Stories
+
+I chose to work with the Articles API since I'm news junky!
+
+First  saved my api key to a variable
+
+```{r}
+api = "gGojTtfdRkDfGOJxPfPi7ZeLAr6O4Wri"
+```
+
+Now looking at the API details the call formula is relatively simple and takes the form of 
+
+```
+https://api.nytimes.com/svc/topstories/v2/CATEGORY.json?api-key
+```
+
+Where category can be one of the following:
+
+arts
+automobiles
+books
+business
+fashion
+food
+health
+home
+insider
+magazine
+movies
+nyregion
+obituaries
+opinion
+politics
+realestate
+science
+sports
+sundayreview
+technology
+theater
+t-magazine
+travel
+upshot
+us
+world.
+
+Let's do an example using 'arts' as a category. 
+
+We already know that the API will spit out a JSON so we can use fromJSON to read it.
+
+We will need to stitch the url base and the api together--so let's use paste0 (which has no space unlike space)
+
+```{r}
+head(fromJSON(paste0('https://api.nytimes.com/svc/topstories/v2/arts.json?api-key=',api)))
+```
+
+
+Ok look's simple enough--let's throw it into a dataframe and a tibble
+
+```{r}
+fromJSON(paste0('https://api.nytimes.com/svc/topstories/v2/arts.json?api-key=',api))  %>% data.frame() %>% as.tibble() %>% head()
+```
+
+
+Well that was easy...the End?
+
+  
+## The End?
+  
+Nope! We both know that Layla is doing something exemplary--and I can't sleep on that! Lets make a handy function that we can specify a category and it returns our dataframe!
+  
+  First let's make a vector of subjects.
+
+```{r}
+subjects= c('arts','automobiles','books','business','fashion','food','health','home','insider','magazine','movies','nyregion','obituaries','opinion','politics','realestate','science','sports','sundayreview','technology','theather','travel','upshot','us','world')
+```
+
+So now it should be a simple as passing a category to our function, pasting it in a URL and then making a dataframe.
+
+Let's do that!
+
+```{r}
+NYTarticle <- function(subject='home')
+{
+#This function returns a dataframe of NYTarticles--it defaults subjects to home and api to my key
+#First let's make a check that a valid subject is passed
+subjectslist= c('arts','automobiles','books','business','fashion','food','health','home','insider','magazine','movies','nyregion','obituaries','opinion','politics','realestate','science','sports','sundayreview','technology','theather','travel','upshot','us','world')
+  if (typeof(subject)!='character')
+  {
+    print('Subject must be a charcter type!')
+  }
+  else if (as.character(subject) %in% subjectslist)
+  {
+    articledf <- fromJSON(paste0('https://api.nytimes.com/svc/topstories/v2/',subject,'.json?api-key=',"gGojTtfdRkDfGOJxPfPi7ZeLAr6O4Wri")) %>% data.frame() %>% as_tibble()
+    return(articledf)
+  }
+  else
+  {
+    print('Invalid Subject: Please select from following list or  leave blank for home')
+    print(subjectslist)
+  }
+  
+
+  
+}
+```
+
+
+So what's going on over the hood is 
+
+1. We can pass a subject (defaulted to home) to our function NYTarticle
+2. We check to make sure the subject is a character otherwise we stop
+3. If it's a character we then check to make sure it's a valid subject by comparing to our list--if it isn't we stop but we give the user the list of options.
+4. If it's a valid list, we stitch it with the query URL, pass it to a JSON and return the dataframe!
+
+
+Let's test it with a non string
+
+```{r}
+NYTarticle(5)
+```
+
+Now with a subject not in the list
+```{r}
+NYTarticle('cars')
+```
+
+Finally with something in the list
+```{r}
+NYTarticle('science')
+```
+
+
+## Conclusion
+
+In thie notebook we made a easy to use function that can accept subject fields and return a dataframe of articles--great for coronavirus reading!
+

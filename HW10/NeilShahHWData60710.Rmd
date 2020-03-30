@@ -1,0 +1,319 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+## Neil Shah: DATA 607: HW 10 Sentiment Analysis 
+
+***
+
+## Introduction: Sentiment Analysis
+
+Sentiment analysis in a nut shell is trying to quantify the emotonal tone [or sentiment] of a body of text [corpus] by mapping the words to a lexicon. A lexicon is a type of dictionary where words are assigned numerical or binary value based on their meaning, positive or negative [polarity]. Sme lexicons might use a numerical score, for example, sad could be mapped as a negative word with score -2  but happy could be positive +3. While others could simply note positive or negative connotations.  Often the text can be processed--for example removing stop word-- to ease analyss. While the scoring and mapping migh vary from  lexicon to lexicon, the overall sentiment analysis methodology is the same.
+
+By converting text to a clean tidy text and quantifying the words we can rapidly compare the sentiment of one corpus to another
+
+***
+
+## Packages Used
+
+I will be using our good friend Tidyverse, Tidytext, textdata [for us of leixcons], wordcloud  and Jane Austen package.
+
+```{r}
+library(tidyverse)
+library(tidytext)
+library(janeaustenr)
+library(textdata)
+library(wordcloud)
+library(reshape2)
+```
+
+***
+
+## Chapter 2  Example Code
+
+
+***
+
+First I'll re-create some of the sample code from Chapter 2 of Text Mining With R to demonstrate simple text analysis.
+
+I'll first load the lexicons and agree to their license.
+
+```{r}
+get_sentiments("afinn")
+get_sentiments("bing")
+get_sentiments("nrc")
+```
+
+
+First we'll take the corpus as all of Jane Austen's books [from austen_books], split them into their respective titles, lines and chapters and tidytext the dataframe. 
+
+```{r}
+
+tidy_books <- austen_books() %>%
+  group_by(book) %>%
+  mutate(linenumber = row_number(),
+         chapter = cumsum(str_detect(text, regex("^chapter [\\divxlc]", 
+                                                 ignore_case = TRUE)))) %>%
+  ungroup() %>%
+  unnest_tokens(word, text)
+```
+
+Now that the text is in tidy form we can do different analysis--just like in the book we will now take this tidytext, score the words via polarity lexicon [bing in this case] in lines of 80,  and then split the positive/negative  sentiment words in to their own columns.
+
+```{r}
+library(tidyr)
+
+jane_austen_sentiment <- tidy_books %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(book, index = linenumber %/% 80, sentiment) %>%
+  spread(sentiment, n, fill = 0) %>%
+  mutate(sentiment = positive - negative)
+```
+
+And now plotting the sentiment [polarity] for each Jane Austen book.
+
+```{r}
+ggplot(jane_austen_sentiment, aes(index, sentiment, fill = book)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~book, ncol = 2, scales = "free_x")
+```
+
+
+Looking at bing or the nrc lexicon that use binary scoring.
+
+The example in Chapter 2 focused on Pride and Prejudice 
+
+```{r}
+pride_prejudice <- tidy_books %>% 
+  filter(book == "Pride & Prejudice")
+```
+
+We'll do the same analysis as above, split Pride and Prejudice by group of 80 lines and score them against the lexicons--NRC/Bing both use binary (negative or posiive) scoring, so we will have to sum up "positive" and "negative' counts.
+
+```{r}
+afinn <- pride_prejudice %>% 
+  inner_join(get_sentiments("afinn")) %>% 
+  group_by(index = linenumber %/% 80) %>% 
+  summarise(sentiment = sum(value)) %>% 
+  mutate(method = "AFINN")
+
+bing_and_nrc <- bind_rows(pride_prejudice %>% 
+                            inner_join(get_sentiments("bing")) %>%
+                            mutate(method = "Bing et al."),
+                          pride_prejudice %>% 
+                            inner_join(get_sentiments("nrc") %>% 
+                                         filter(sentiment %in% c("positive", 
+                                                                 "negative"))) %>%
+                            mutate(method = "NRC")) %>%
+  count(method, index = linenumber %/% 80, sentiment) %>%
+  spread(sentiment, n, fill = 0) %>%
+  mutate(sentiment = positive - negative)
+
+
+```
+
+And now plotting. 
+
+```{r}
+bind_rows(afinn, 
+          bing_and_nrc) %>%
+  ggplot(aes(index, sentiment, fill = method)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~method, ncol = 1, scales = "free_y")
+```
+
+
+Focusing on the BING (once again binary lexicon)
+
+```{r}
+bing_word_counts <- tidy_books %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  ungroup()
+```
+
+We can arrange them in order of highest word counts and plot.
+
+Remember--since bing is binary we have to sum counts but it doesn't differentiate between "love" or "better", they are both "positive" while afinn lexicon would.
+
+```{r}
+bing_word_counts %>%
+  group_by(sentiment) %>%
+  top_n(10) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~sentiment, scales = "free_y") +
+  labs(y = "Contribution to sentiment",
+       x = NULL) +
+  coord_flip()
+```
+
+
+
+This demonstrates a working example of sentiment analysis from Chapter 2.
+
+***
+
+## Sentiment Analysis on The Adventures of Sherlock Holmes
+
+***
+
+Let's do analyisis on one of my favorite collection of stories, The Adventures of Sherlock Holmes by Arthur Conan Doyle. 
+
+```{r}
+library(gutenbergr)
+```
+
+Looking online the gutenberg ID for 1664
+
+```{r}
+holmes <- gutenberg_download(1661)
+head(holmes)
+```
+
+Now for some pre-processing, I'm going to strip the first 28 lines to get rid of the Transcriber Notes and chapter headers. I will first sort them by LineID 
+
+```{r}
+holmestidy <- holmes %>% 
+  slice(-(1:28)) %>% 
+  #Gets rid of CHAPTER 
+  filter(!text==str_to_upper(text)) %>%
+  #removes the gutenberg_id
+  select(-gutenberg_id) %>% 
+  mutate(LineID = 1:n())
+head(holmestidy)
+```
+
+We now have the entire text in a tidy formed data frame and we  can use unnest_token to manipulate it.
+
+For example if we want to break them into sentences
+
+```{r}
+holmestidy%>% 
+  unnest_tokens(output=sentences, input=text, token='sentences')
+```
+
+or 
+
+Words
+
+```{r}
+holmestidy%>% 
+  unnest_tokens(output=words, input=text, token='words')
+```
+
+We now have the text stripped of Chapters and organized by LineID
+
+Let's just see which words are said the most
+
+```{r}
+holmestidy%>% 
+unnest_tokens(output=words, input=text, token='words') %>%  count(words) %>%  arrange(desc(n))
+```
+
+Looks like stop words! Let's filter those out and sort again
+
+```{r}
+holmestidy%>% 
+  unnest_tokens(output=word, input=text, token='words') %>%  anti_join(stop_words) %>%  count(word) %>%  arrange(desc(n))
+```
+
+
+Much better--and I guess it make sense that holmes is mentioned that many times--he is the main character!
+
+```{r}
+holmesclean <- holmestidy%>% 
+  unnest_tokens(output=word, input=text, token='words') %>%  anti_join(stop_words)
+```
+
+### Sentiment Analysis via BING
+
+I'll repeat the Chapter 2 example via Bing--note these bodies of work are much smaller than [there is a total of 100k words in Adventures of Sherlock Holmes versus 100k in *just* Sense & Sensibility, I won't be using 80 line filter]
+
+```{r}
+holmesclean %>%
+inner_join(get_sentiments("bing")) %>%
+count(word, index = LineID, sentiment) %>%
+spread(sentiment, n, fill = 0) %>%
+mutate(sentiment = positive - negative)
+```
+
+let's plot it! I'm adding a smoothlined as well to see trends.
+
+
+```{r}
+holmesclean %>%
+inner_join(get_sentiments("bing")) %>%
+count(word, index = LineID, sentiment) %>%
+spread(sentiment, n, fill = 0) %>%
+mutate(sentiment = positive - negative) %>%
+ggplot(aes(index, sentiment)) + geom_col() +geom_smooth() +ggtitle('BING Sentiment in Adventures of Sherlock Home by line')
+```
+
+Well that's interesting--it seems that overall there isn't really a big sentiment change as we move through his works--the smoothed line it slightly negative, so maybe there is some negative words overall, but overall we are in a pretty tight range from -2 to 2 [negative to positive] sentiment and most of all neutral around 0.
+
+***
+
+## Sentiment Analysis via Jocker 
+
+
+Let's try another sentiment lexicon!
+
+I found a package called lexicon that has other lexicons to use.
+
+```{r}
+library(lexicon)
+```
+
+I found an interesting lexicon called Jocker's Sentiment Table which is used to extract plot and story sentiment elements! This could be interesting so I want to try using it here!
+
+Pulling it up
+```{r}
+lexicon::hash_sentiment_jockers
+```
+
+Ok let's store this as another datatable and rename the columns (they are x,y) to make it easier for me.
+
+```{r}
+jocker <- lexicon::hash_sentiment_jockers
+names(jocker) <- c('word','sentiment')
+```
+
+Now repeating the same plot from last time--but with some key differences--Jocker uses strictly a numerical scale for positive/negatively word in the context of plot development. So negative words like abandon or "death" could mean a conflict/crisis or low part of the plot while more positive like "wins" could mean closure and ending.
+
+So let's do the same analysis but I won't need to make a difference or mutate/spread the text since the sign of the sentiment indicates the direction. 
+
+```{r}
+holmesclean %>%
+inner_join(jocker) %>%
+count(word, index = LineID, sentiment) %>%
+ggplot(aes(index, sentiment)) + geom_col() +geom_smooth() +ggtitle('Jocker Sentiment in Adventures of Sherlock Home by line')
+```
+
+
+This is interesting since Jocker's analysis is noted for being able to detect plot points. First the overall smoothed line is around 0 which I sort of expected--these collection of stories all typically are wrapped up at the end [it was a serial novel] so I expected overall neutral. However looking at the individaul spikes shows us the plot structure!
+
+Notice the negative sentiment spike around 5000 mark--which is half way through the book, which is a common theme in story telling--this is deep into the story where the hero typically has to overcome an obstacle, and these spikes (negative) get more frequent towards the end as the hero (Sherlock Holmes) has to overcome/solve all the mysteries. 
+
+On the positive sentiment side they aren't the same magnitude as some of the negative sentiment spikes, but they are frequent towards the end as Sherlock solves the capers. I imagine since there was always another mystery and the fact that the character himself didn't retire with "endless praise" or essentially super positive words, that's why we don't see huge positive sentiments.
+
+Very cool!
+
+## Conclusion
+
+Sentiment analysis is one function of NLP and is a great tool to help quantify/visualize something that is typically not mathematical--human language. Analysis will all depend on the lexicon and how it's mapped--which is still a very human thing, but it seems the machines can be closer to understanding!
+
+
+## References
+
+1. [Tidy Text Mining in R](https://www.tidytextmining.com/sentiment.html)
+2. [Project Gutenberg](https://cran.r-project.org/web/packages/gutenbergr/gutenbergr.pdf)
+3. [Lexicon for R](https://github.com/trinker/lexicon)
+4. [Jocker-A Novel Method for Detecting Plot](https://www.matthewjockers.net/2014/06/05/a-novel-method-for-detecting-plot/)
+
+.

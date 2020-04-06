@@ -1,0 +1,65 @@
+---
+title: 'DATA 607: Recommender Systems'
+author: "Neil Shah"
+date: "4/6/2020"
+output: html_document
+---
+
+
+# Neil Shah: DATA 607: Recommender Systems: The Hinge Dating App
+
+## Introduction:
+
+Companionship and parternship is still a common theme among adults and while the methods of dating have changed, the desire for love have not. The book [Modern Romance](https://www.amazon.com/Modern-Romance-Aziz-Ansari/dp/0143109251) by Aziz Ansari takes a recent antrophological look at dating in the technology age, and shows the domination of online dating [OLD] as being the primary match-maker over traditional analog mean, such as mutual friends, events or arrainged marriages. 
+
+It's no suprise that the market-place is filled with dating apps, from the large mainstays as Tinder, Match.com, OKCupid, Coffee Meets Bagel to very niche and ethnic specific apps, such as Dil Mil or Farmers Only. Needless to say with the plethora of data out there, and robust literature on recommender systems such as Netflix or Amazon, that can easily predict your next target, users of dating apps still spend hours if not months/years on the platform; concluding that dating apps are still not mature enough to predict your perfect match.
+
+Today I'll focus on [Hinge](https://hinge.co/) which is another popular dating app that has implemented a "recommender system" to gauage compatibility. 
+
+Also--from a personal note--the author uses this app extensively and is still looking for <3.
+
+
+## Scneario Design
+
+For the organization:
+
+**Target Users:** 18+ single adults with mobile phones that are willing to pay for subscription services
+**Key Goals:** Have more active users for revenue but also to increase churn [new users]
+**Strategy:** Have users spend time on the app but ultimately find success, and gain new users through testimonials
+
+For User
+
+**Target Users:** All users that fit their preferences 
+**Key Goals:** A recommender system that helps increase probability  relationship compatibility 
+**Strategy:** Fruitful recommendations based on actual interest 
+
+
+## Recommender System
+
+Hinge uses a popular and Nobel Winning [Gale-Shapley](https://www.nobelprize.org/prizes/economic-sciences/2012/press-release/) algo to generate matches--while the details of the algo are beyond the scope of this RMD, this now ubqituious algo seeks to find stable pairing of matches through a series of ranking. In essensce each participant will rank the opposing participant in terms of match desirability, and then be initially paired, and then subsequent rounds are iterated through until a stable match in which each participant has a match, in which both parties have ranked optimally. This is a variation of the [Stable Marriage Problem](https://en.wikipedia.org/wiki/Stable_marriage_problem) and is the basis of the Gale-Shalpey algo--fun fact, this is how medical matching for residents work.
+
+Hinge employs a similar [implementation](https://techcrunch.com/2018/07/11/hinge-employs-new-algorithm-to-find-your-most-compatible-match-for-you/) with a slight twist; users first put in their own biographical data [age, gender, religion, education] and then attributes on their profile [photos, quotes or just desires] and then are shown candidates; they binarily "like" part of the the candidates attributes or decline the entire candidate profile. Alterantively the user can also put constraints on the match via biographcial data [once again age, gender, religion, education and etc] to filter out the candidate bool. 
+
+If a user likes each other profile they are then matched, and a chat option is opened up for conversation, with prompts on whether one met, exchanged numbers and so forth.
+
+Hinge then has a pool of parameters based on the users "liked" official and the unofficail biographical data on the candidates and their filer, and then gives the highest ranked compatible match for both parties.
+
+## Suggestions 
+
+**Post Match Heuristics**
+
+One pitfall with ranking solely on whether a user liked a profile is that:
+
+1) [https://digital.hbs.edu/platform-rctom/submission/hinge-a-data-driven-matchmaker/](studies) have shown that a user's true implicit wants don't necesarily match with what they say, that is a user is a unreliable narrator and they might actually prefer another profile despite specified parameters
+
+2) Online dating tends to be very volume heavy with churn with low risk--it is very easy to click like indiscriminatly without giving through to compatibility due to minimum effort
+
+I beleive that relying predominatntly  on the pre swipe attributes is erroneous and that actual preference/compatibility should be gauged by what happens after a "match' or in diaglogue. Perhaps metrics such as
+
+1) Duration of conversation or words  [or emojis]--which would imply more conversation/compatibility
+
+2) Whether a number was exchanged or not 
+
+3) Surveys afterwards 
+
+Would help provide more targetted information on true ranking/desirability and increase matches. 

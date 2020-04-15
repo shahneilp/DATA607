@@ -1,0 +1,316 @@
+---
+title: 'Neil Shah: DATA 607 Project 4'
+output:
+  prettydoc::html_pretty:
+    theme: tactile
+    highlight: vignette
+---
+
+
+# Text Classification
+
+## Introduction:
+
+Text classification has become a cornerstore of NLP (Natural Language Processing), and one of the bright spots in machine learning. When we read texts, be it emails, book, research paper or even text messages, we subconciously process the language through context clues, diction and understanding of the language. More importantly text unlike structured datasets such as time series, often has a loose structure and needs to be re-ordered to derive anything meaningful--a double edge sword for machine learning, where a "human" pre-processing element might be the bottleneck to releasing processing power. However the meteoric use cases and results, have provided ubiquitous and invaluable in our lives--from spam filtering in GMAIL, recommending the next Netflix movie to automated customer support. 
+
+In this project we'll be focusing on **binary text classification** in which we'll try to classify a corpus [body of text] to two distinct yes/no states.
+
+
+## Twitter Fake or Not Disaster Data
+
+I will be using the [Kaggle: Real of Fake Twitter Disaster](https://www.kaggle.com/c/nlp-getting-started/data) set that is part of an on-going competition (which I intend to enter). <br>
+
+The motivation behind this dataset is to identify real or fake disaster tweets based on the tweet text itself, keywords, location, and other hashtags. While most tweets are associated with a picture that a human could delineate between--for example "Madison Square garden is on Fire" could mean a potential vibrant performance, rather than a conflagration, but machines don't know how to read pictures. Given the rise in fake news and other social media polarization, this is an interesting topic.
+
+The data set consists of a testing and training csv files, which are hosted on my [Github](https://github.com/shahneilp/DATA607/tree/master/Project%204). Both datasets have the  defined following attributes:
+
+1. ID (numerical list)
+2. keyword (if user classified via hashtag)
+3. location (if there was a location provided)
+4. Tweet text.
+
+Note the keyword and location attributes might (and often are blank).  Furthermore the training set has a **target** attribute, 1 [whether there was an actual disaster] or 0 [there was  none].
+
+The observations are in no particular order--and hence do no need to be randomized  
+
+For this project we'll be: 
+
+1. Exporatory Data Analysis
+2. Text Pre-processing
+3. Feature Extraction
+4. Model Building 
+5. Conclusions and Recomendatiosn 
+
+## Installing Packages 
+
+As usual we will load a few packages to help us out.
+
+```{r}
+#Our good friend tidyverse
+library(tidyverse)
+#textmining which will help form the DTM
+library(tm)
+#SnowballC for stemming
+library(SnowballC)
+#CaTools for train/test splits
+library(caTools)
+#e1071 for Navie Bayes Classifier and SVM
+library(e1071)
+#Caret for confusion matrix
+library(caret)
+#For XGboost
+library(xgboost)
+```
+
+
+## Loading Data set and Exploratory analysis 
+
+First we'll load our dataset from my hosted GitHub
+
+```{r}
+df <- read_csv('https://raw.githubusercontent.com/shahneilp/DATA607/master/Project%204/train.csv')
+```
+
+We have a data set consisting of 5 columns [id, keyword, location, text and target] with 7603 observations
+
+```{r}
+head(df)
+```
+
+It's apparent that there are missing values for keyword and location. Quickly calculating how many NA values by percentage
+
+```{r}
+map(df, ~sum(is.na(.))/nrow(df)*100)
+```
+
+So 33% of location and 0.8% of keyword are empty while the tweet text, id and classification [as expected] are not. Normally, the keyword missing data wouldn't bother me (such a small%) but I want to ensure uniformity in my data. I'm also dropping the 'id" tag since it doesn't really provide any unique valye given we have an index.  
+
+```{r}
+df <- subset(df, select = -c(id,keyword,location) )
+head(df)
+```
+
+Quickly looking at the current breakdown of the classified data
+
+```{r}
+hist(df$target)
+df %>% group_by(target) %>% tally()/nrow(df)
+```
+
+We see that 57% of the entries are labeled 0 or fake disaster and 43% are 1, or real disaster.
+
+Let's look at some random tweets
+
+```{r}
+df$text[14:20]
+```
+
+Looks like unstructured text, with various cases, punctuation and stop words (and, is ,etc). We'll handle that in the next section
+
+## Corpus building and Text Pre-Processing 
+
+First we'll build our corpus based on the text column. 
+
+```{r}
+corpus <- VCorpus(VectorSource(df$text))
+```
+
+Now we'll need to process the corpus before we start running any machine learning--think of this is as "tidying" up but for text. We'll do the following
+
+1. Remove missing values [we already verified there were none]
+2. Strip whitespace 
+3. Convert the text to lowercase [ensures uniformity]
+4. Remove puncutation 
+5. Remove stop words such as "and, is, or" which don't provide meaning 
+6. Stemming--which normalizes words such as bartered, bartering to there base, barter. We will be using **SnowBallC* which implement's [Porter's stemming algo](http://www.cs.odu.edu/~jbollen/IR04/readings/readings5.pdf), which is the defacto standard
+
+To do this we will utilize tm_map transformations--easy!
+
+```{r}
+#Remove whitespace
+corpus <- tm_map(corpus, stripWhitespace)
+#Lower Case
+corpus <- tm_map(corpus, content_transformer(tolower))
+#Remove Punctuation
+corpus <- tm_map(corpus, removePunctuation)
+#Remove Stop Words
+corpus <- tm_map(corpus, removeWords, stopwords())
+#Stemming via stemDocument from SnowBallC
+corpus <-tm_map(corpus, stemDocument)
+```
+
+## Feature Engineering and Train/Test Split
+
+With your text processed we can now build features that will ultimately be used in our model. First we'll develop a document term matrix which mathematically links frequency of words in our corpus.
+
+```{r}
+dtm <- DocumentTermMatrix(corpus)
+```
+
+We have 7613 documents (same as our observations in our dataset) with 19071 words--the longest term is 52 characters long. We have a high sparsity percentage (100%) which relates to how often words appear between our document but also can be a problem since we'll have many zeroes, and might impact predictive power.. We'll filter out some of the sparse words.
+
+```{r}
+dtm <- removeSparseTerms(dtm,sparse = 0.995)
+```
+
+Now we'll re-construct our dataset using our newly created dtm, and add back the target variable.
+
+```{r}
+#Matring a matrix
+tweetdf = as.data.frame(as.matrix(dtm))
+#Adding back our classification target from original dataset
+tweetdf$target <- df$target
+```
+
+
+We now have our our dataset that will be the basis for modeling.  Before we apply models we need to split up our data test into a training set, that will learn based on the already classified data, and a testing set that we'll test our models on. This is common practice in the industry in order to prevent overfittin!
+
+We'll do a 80/20 train/test split--and can use **caTools** to split it up.
+
+```{r}
+#Setting a random seed
+set.seed(1243)
+split = sample.split(tweetdf, SplitRatio = 0.80)
+traindf = subset(tweetdf, split==TRUE)
+testdf = subset(tweetdf, split==FALSE)
+```
+
+
+## Modeling and Analysis 
+
+Now that we have our dataset we can start applying predictive models and use the confusion matrix to assess their accuracy. The methodology will be the same for each model.
+
+1. Initiate each classifier via the training set data and training set data target.
+2. Use the classifier to make predictions on the test set/test target
+3. Store results in a confusion matrix.
+4. Each classifier will also be timed to show run time. 
+
+
+### Naive Bayes Classifier
+
+Naive Bayes is a very simple yet powerful classifier that uses Bayes condition theorem to classify. NB will look at each feature independently and devise a probabilistic estimate. 
+
+```{r}
+start_time <- Sys.time()
+NBclassifier <- naiveBayes(traindf[1:316], as.factor(traindf$target))
+NBprediction <-predict(NBclassifier,testdf[1:316])
+end_time <- Sys.time()
+end_time - start_time
+confusionMatrix(data = NBprediction, reference = as.factor(testdf$target),
+                positive = "1", dnn = c("NB Prediction", "NB Actual"))
+```
+
+While these statistics might look like overkill our NB classifier had an accuracy of **74.02%** and executed around 20-23 seconds. 
+
+Let's try another model
+
+
+### Support Vector Machine
+
+Another classifier is a Support Vector Machine--which will form binary classification of our sets and form a hyperplane (fancy word for n-dimensional separator) that maximizes margin. A great overview is [here](https://monkeylearn.com/blog/introduction-to-support-vector-machines-svm/)
+
+Unlike NB which uses probablities--SVM uses geometric separation to classify. 
+
+
+Once again we'll follow our methodology 
+
+```{r}
+start_time <- Sys.time()
+SVMclassifier <- svm(traindf[1:316], as.factor(traindf$target))
+SVMprediction <-predict(SVMclassifier,testdf[1:316])
+end_time <- Sys.time()
+end_time - start_time
+confusionMatrix(data = SVMprediction, reference = as.factor(testdf$target),
+                positive = "1", dnn = c("SVM Prediction", "SVM Actual"))
+```
+
+Our SVM classifier had a accuracy of **77.93** which is better than our NB classifer--but there was a trade off with time; it took nearly 2-3 minutes to run. 
+
+
+
+### XGBoost
+
+XGBoost was recommended by colleague **Jeff Shamp**; it's a tree based classifier that uses gradient boosting [which is beyond the scope of this markup] but is essentially the use of gradient descent to minimize losses. Furthermore XGBoost  is an **ensemble* technique that uses repeated trees (pathways for classification) to magnify predictive power. XGboost is known to be fast and efficient. 
+
+XGboost is called similar to the previous NB but we must modify our dataframe since it only takes vectors/matrix. For now we'll specify nrounds = 1 which is just 1 tree; this will be one broad classification. 
+
+```{r}
+start_time <- Sys.time()
+XGBoost <-xgboost(as.matrix(traindf[1:316]), label=as.vector(traindf$target),nrounds=1)
+XGBoostpred <- predict(XGBoost, as.matrix(testdf[1:316]))
+end_time <- Sys.time()
+end_time - start_time
+XGBoostpred<- ifelse(XGBoostpred >0.5, 1,0)
+confusionMatrix(data = factor(XGBoostpred, levels=c(1,0)),
+                reference = factor(testdf$target, levels=c(1,0)),
+                positive = "1", dnn = c("XGB  Prediction", "XGB Actual"))
+
+```
+
+XGBoost is fast--it took only 1-2 seconds to trai/predict the model but it only had an accuracy of **64.13**? Well one reason is that we used only 1 tree! As mentioned before the more trees, the more possible predictive power but there is always a trade off of accuracy/time. .
+
+Let's try using 5 trees.
+
+```{r}
+start_time <- Sys.time()
+XGBoost <-xgboost(as.matrix(traindf[1:316]), label=as.vector(traindf$target),nrounds=5)
+XGBoostpred <- predict(XGBoost, as.matrix(testdf[1:316]))
+end_time <- Sys.time()
+end_time - start_time
+XGBoostpred<- ifelse(XGBoostpred >0.5, 1,0)
+confusionMatrix(data = factor(XGBoostpred, levels=c(1,0)),
+                reference = factor(testdf$target, levels=c(1,0)),
+                positive = "1", dnn = c("XGB  Prediction", "XGB Actual"))
+```
+
+Now our accuracy is nearly *70.96** percent and it only took another 1 second--still not as good as our NB classifier or our SVM--but this took only 2-3 seconds!
+
+Finally--let's go back to our XGBoost and increase the number of trees to 100. 
+
+```{r}
+start_time <- Sys.time()
+XGBoost <-xgboost(as.matrix(traindf[1:316]), label=as.vector(traindf$target),nrounds=100)
+XGBoostpred <- predict(XGBoost, as.matrix(testdf[1:316]))
+end_time <- Sys.time()
+end_time - start_time
+XGBoostpred<- ifelse(XGBoostpred >0.5, 1,0)
+confusionMatrix(data = factor(XGBoostpred, levels=c(1,0)),
+                reference = factor(testdf$target, levels=c(1,0)),
+                positive = "1", dnn = c("XGB  Prediction", "XGB Actual"))
+```
+
+Now we can clearly see the power of the ensemble for XGboost--we achieved an accuracy of **77.67** in around 17-20 seconds. 
+
+
+## Conclusions
+
+Comparing our classifier results we see that
+
+1) None of them achieved a perfect classifcation accuracy--but this is realistic given the relative size of our dataset (<10000 rows) and the relative lack of overlap between observations [tweet sparsity matrix]. I'm sure with more data we would be able to refine our process. 
+
+2) While SVM had the highest accuracy , it took the longest to run. Naive-Bayes was relatively quick but had a lower accuracy; finally XGboost was the fastest and have the greatest gain in accuracy with minimum trade off in speed.
+
+Each of these tools can be used differently depending on your case--if time isn't an issue, SVM seemed to do the best job. Otherwise NB is a quick alternative or XGBoost. 
+
+
+## Recommendations 
+
+
+Model building and predictive analysis can be a rabbit-hole to go down, and there are always improvements! Further work could include.
+
+1. Modifying corpus: I didn't include the keywords or locations in my corpus--but maybe there is value in it, more advanced models could include these terms and weight them.
+
+2. Different sparsity/document matrix/pre-processing: We could a TDIF inverse or keep capitalization since this could be important for Tweets.
+
+3. Model: Of course we could always run more models--a possible secondary study could involve combining models or further feature extraction. 
+
+
+## References
+
+
+1. [Kaggle NLP--Real or Tweet](https://www.kaggle.com/c/nlp-getting-started/data/)
+2. [Text Mining in R](https://www.tidytextmining.com/)
+3. [Porter's stemming algo](http://www.cs.odu.edu/~jbollen/IR04/readings/readings5.pdf)
+4. [XGBoost](https://www.analyticsvidhya.com/blog/2016/01/xgboost-algorithm-easy-steps/)
+5. [Naives Bayes](https://www.rdocumentation.org/packages/e1071/versions/1.7-3/topics/naiveBayes)
+6. [SVM](https://monkeylearn.com/blog/introduction-to-support-vector-machines-svm/)

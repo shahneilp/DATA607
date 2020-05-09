@@ -1,0 +1,623 @@
+---
+title: 'Analyisis of Macro to Micro level impact of Oil Prices by Neil Shah'
+output:
+  prettydoc::html_pretty:
+    theme: tactile
+    highlight: vignette
+    toc: true
+---
+
+# Introduction and Motivation
+
+Oil and fossil fuels play a crtical part of modern life, fueling transpotation, powering industrial activity and driving global economic growth. Energy independence is a common theme in US rheotric. and the nation has have had a love-hate relationship with the commodity. During the 1970s oil embargo prices for fuel sky rocketed hobbling the US economy, and the spectre of "foreign oil" permeated through the national dialogue, with an "added tax" added to the consumer.  However this relationshp shifted in 2008, when the "Shale Revolution", a domestic boom in oil production, helped turn the US from an net importer to net exporter of oil. In recent time the administration has tweeted about oil prices as both a tax cut and integral part of the economy.
+
+![](https://assets.bwbx.io/images/users/iqjWHBFdfxIU/ieqONzeii5SY/v0/1200x902.jpg)
+![](https://assets.bwbx.io/images/users/iqjWHBFdfxIU/iX.Li5vR86kg/v1/360x-1.png)
+
+The goal of this report is to analyze the domestic impact on the United States economy in a top down macro-micro economic fashion--first looking at the impact on consumers, then on individual oil rich states and finally contrasting two cities within a state. 
+
+Specifically: Datasets will be split between "high oil prices" and "low oil prices", and samples measured by statistical correlation.
+
+**Is high or low oil price good for the US economy?**
+
+# Methodology and Data Work Flow
+
+While the analysis will be split into three focus area, they will all share the following work flow.
+
+1. Research Question/Motivation:  
+
+2. Identification of Scope: Identifying the data of interest  
+
+3. Initial Data Acquistion: Acquiring relevant data through API, reading csv or other means.
+
+4. Data Cleaning/Initial Exploratory Data Analysis: Cleaning and munging the data, and visualization of trends.
+
+5. Modeling and Analysis: Testing research hypothesis/question through statistical and visual modeling.
+
+6. Evaluating Results and Conclusion: Evaluating research question and results in context. 
+
+## Packages
+
+The following packages are used for analysis
+
+
+```{r,warning=FALSE,message=FALSE}
+#Quandl for API 
+library(Quandl)
+#our good friend tidyverse
+library(tidyverse)
+library(readxl)
+#Zoo for time series
+library(zoo)
+#Correlation plots 
+library(corrplot)
+source("http://www.sthda.com/upload/rquery_cormat.r")
+#Statistical
+library("Hmisc")
+```
+
+## Data Sources and Management
+
+Data will be acquired in the following distinct fashions
+
+1. Reading of organized tabulated data found online through various soruces
+
+2. Ingesting data through API calls via Quandl--notably the EIA [Energyy Information Agency], Bureau of Labor & Statistics, and other data sources. 
+
+Data will be stored in dataframes for ease of analysis, with all master data hosted on project GitHub
+
+
+## Quandl API 
+
+Quandl is a unique aggregator of various economic data that provides interfacing through an API which has documentation [here](https://docs.quandl.com/). By specifying the type of data and then using a unique code, data can be ingested relatively simply. Users needs to register for the API, and authorize it via key, and use the QuandL R package, which was loaded earlier. 
+
+**The author has saved his unique API key to the variable "key" which has been loaded without echo in this markdown--for reproducible results, one needs to do the same**
+
+
+```{r include = FALSE}
+key <-"HuTD7uo4-doS1PVER9um"
+```
+
+
+For example going to the EIA webpage on [Cushing oil Data](https://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?n=PET&s=W_EPC0_SAX_YCUOK_MBBL&f=W) one can see from the EIA url that the API key is "W_EPC0_SAX_YCUOK_MBBL&f=W".
+
+The data set can be passed to Quandl API via R.
+
+```{r}
+cushing <-Quandl("EIA/PET_W_EPC0_SAX_YCUOK_MBBL_W", api_key=key)
+head(cushing)
+```
+
+Depending on the query, Quandl API can also have other parameters such as time-range or even format (which we will see below.)
+
+For example specifying a start-date parameter below only queries data for 2005 onward. 
+
+```{r}
+crude <-Quandl("CHRIS/CME_CL3.6", type='zoo',start_date='2004-12-31', api_key=key)
+head(crude)
+```
+
+By chaining and manipulating the query, data sets can be generated which will be used extensively in this report.
+
+
+# Preliminaries: Time Series Analysis and Correlation
+
+So far in 607 we have never worked with time-series data, which are data points organized by an specific index, time. This differs from a traditional R datafraeme that might have a specific column that has dates, but still a numerical index. If the index is replaced with timestamps, it would be a time-series--the difference is nuanced but important as time-series don't need to adhere to fixed length spacing.
+
+R [and the quandl API] have two unique objects that we haven't covered in 607 on dealing with time-series. The "zoo" and "ts" time-series object; A "zoo" object is a special class object that consists of a series (or dataframe) where the index is time stamps, which may be irregular. Full documentation is [here](https://cran.r-project.org/web/packages/zoo/vignettes/zoo-quickref.pdf) The "ts" is similar object but has fixed increments. 
+
+One way to convert a dataframes/series to a zoo object is through mapping the dates--the author made this function to help. 
+
+```{r}
+dfTozoo = function(tsdataframe, dateformat="%m/%d/%Y"){
+
+  framedates = as.Date(tsdataframe[,1], format=dateformat)
+  n=ncol(tsdataframe)
+  zoodata = zoo(tsdataframe[,2:n], order.by=framedates)
+
+  return(zoodata)
+}
+```
+
+Another way is to specify the format type in the API call to "zoo" 
+
+```{r}
+Quandl("EIA/PET_W_EPC0_SAX_YCUOK_MBBL_W",type='zoo', api_key=key) %>% head()
+```
+
+Either way the resultant is a vector with index/column time-stamps--the base sampling period is Weekly for EIA data.
+
+Times series present their own nuances--specifically that time series data is usually compoesed of additive components of seasonality, trend and a randomness; as seen below. 
+
+
+![](https://i.stack.imgur.com/4HbER.png)
+
+More importantly another challenge is how to compare data on various time scales?
+
+# Resampling Time Series 
+
+One way solution is to transform this data is to re-sample said data to another granularity--an up-sampling involves converting a time series to a higher time frame (days to months for example) while down sampling would be the opposite (months to days.) Up sampling essentially averages out your data and smooths it out while down sampling, uses extrapolation and relies on the user for how to backfill values. 
+
+Due to the varied time measurements of the datasets in this analysis, this presents a challenge and thus the author sought to find a way to quickly resample the data, so direct comparison can be made in the same time frame. 
+
+One method could simply taking average over a time-series but that assumes there are fixed increments, and an easy cut off. Another solution the author found was using the xts object, an extension of zoo, which allows resampling based on months, and years, and other time frames. Full documentation is [here](https://www.rdocumentation.org/packages/xts/versions/0.12-0/topics/xts).
+
+For example calling the same cushing data as a zoo and using "as.xts()' and "to.monthly()" makes a monthly sampled data from our weekly, automatically aggregating the data by the passed time period. 
+
+```{r}
+Quandl("EIA/PET_W_EPC0_SAX_YCUOK_MBBL_W",type='zoo', api_key=key) %>% as.xts() %>% to.monthly() %>% head()
+```
+
+
+The data is recast in OHLC or Open High Low Close format where Open is the price at the beginning of the original sample, high/low reflect the max/min values over the resampled range and close is the ending. To approximate the price over the period we can use the RowMeans function. 
+
+In order to expedite data munging the author made the following function can take a resample dataframe, calcualte the mean, drop the other columns, and rename it to a passed name.  
+
+```{r}
+cleaner <-function(dataframe,name)
+{
+  dataframe$mean<-rowMeans(dataframe)
+  dataframe <- subset(dataframe, select = c(names(dataframe)[5]))
+  names(dataframe)<-c(name)
+  return(dataframe)
+}
+
+```
+
+Using the above function to clean the previous Quandl function provides a clean dataset.
+
+```{r}
+cushing <-Quandl("EIA/PET_W_EPC0_SAX_YCUOK_MBBL_W",type='zoo', api_key=key)
+head(cleaner(to.monthly(cushing),'Cushing'))
+```
+
+
+Merging time-series zoo objects can be accomplished via "merge()" function which joins time series objects in an outerjoin fashion on the index, which will populate columns with shared index and NAs for other values.  This is a handy feature as by using a na.trim() function, which removes rows with NA, the dataset will automatically be truncated to a frame where there are shared values. 
+
+This method of resampling, transforming, merging and then truncating data will be used extensively to generate the core datasets for analysis. 
+
+Finally plotting time series zoo can be achieved via a normal plot or plot.zoo
+
+```{r}
+plot(cleaner(to.monthly(cushing),'Cushing'),main='Cushing')
+```
+
+# Statistical Correlation and Correlation Matrices 
+
+To quantify  the strength of relationship between time-series, the Spearman correlation coefficient will be calculated and compared. Simialr to the Pearson, the Spearman coefficiant (rho) ranges from strong negative relationship -1 to a strong positive relationship, +1; with 0 being no relationship. However the Spearman coefficient is non-paramaetric, that is it doesn't require a normal distribution underlying like the Pearson, and therefore appropriate to use for time-series, which have components of trend, season that preclude normal distribution. 
+
+While rho will give an indication of the relative strenght of relationship, the p value will indicate the statistical significance--an alpha of 0.05 will be used for threshold.
+
+It's important to note that 
+
+1. **Spearman coefficient will tell the strength of monotonic relationship but not type--linear or what not.** 
+
+2. **It isn't a robust statistic or metric used to judge one model from another, since it's robust--if models were build RMSE could be used. That is beyond the scope of this report**
+
+For this analysis however this should be sufficient to evaluate general causality. 
+
+Visually a correlation matrix maps the relationship between all values and their correlation with others, on a common color scheme.. 
+
+![](https://46gyn61z4i0t1u1pnq2bbk2e-wpengine.netdna-ssl.com/wp-content/uploads/2018/09/corrplot.png)
+
+# Preliminary: Oil Data 
+
+Naturaly we'll need oil pricing data to start this analysis--and there are various ways to obtain it but the easiest was through the Quandl API, which hosts databases for various statistics and economic activity. The price of oil can be proxied by the WTI futures (West Texas Intermediate) oil contract, which trades on the NYMEX. While the intracies of a futures contract is beyond the scope of this report, WTI will be chosen as a proxy, specifically the M+3 contract, which is the month+3 constract, representing the price of oil contract 3 months (or a quarter) in the future. This timing is used as it directly impacts the forward business cycle. 
+
+Key Assumptions Made: M+3 (next quarter) WTI oil derivative price is proxy for oil impact. 
+
+
+## Loading  Oil Data
+
+Using the Quandl API a dataframe for crude can be generated along with a quick visualization of historical oil prices. The contract code (CL3 for 3rd month Crude) is married with the CME (exchange) and passed to the CHRIS (continuous future database).
+
+Using Quandl a query can pull the last 20 years of data (start date of approximately 12-20 ).
+
+```{r}
+crude <-Quandl("CHRIS/CME_CL3.6", type='zoo', start_date='2000-12-01',api_key=key)
+plot.zoo(crude,main='Crude +3',xlab='Time',ylab='Price $ per bbl')
+```
+
+The plot shows the trend of crude oil prices for the 20th century--prices started off low and then exponentially increased until hitting a zenith of $140 in 2007, followed by a sharp crash From 2010-2015 oil prices remained elevated until another crash, at the beginning of 2015, followed by a period of lower prices. Most recently oil prices crashed at the start of 2020. 
+
+## Oil Regimes
+
+Focusing on the 2010 onward portion of the plot, and resampling crude prices on a monthly basis.
+
+```{r}
+crude <-Quandl("CHRIS/CME_CL3.6", type='zoo', start_date='2009-12-01',api_key=key)
+crude <-to.monthly(crude)
+crude <-cleaner(crude,'oil')
+plot.zoo(crude,main='Crude +3',xlab='Time',ylab='Price $ per bbl')
+```
+
+
+Two distinct regions are now apparent
+
+1. 2010-end of 2014: Oil prices above $80--or "expensive oil prices"
+2. 2015 onward: Oil prices below $50 or "cheap oil prices".
+
+These two regime time-periods will serve as the basis for comparisons. 
+
+Given that the crude dataset has 126 rows and picking index 60 and 70, which mark off $72 and higher crude and approximately $45
+
+These index locations can serve as the splits for testing out the expensive vs cheap crude. 
+
+
+# Consumer Based Impact Analysis
+
+While the markets are often used as a proxy for the economy, they are forward looking and don't always reflect the mainstay for the average consumer. In fact there are growing concerns about the wealth inequality in America, and decreasing share of financial market participation by the average American. The following figure reflects how the top 10% have increasing grown their wealth, at the expense of the bottom 90%. 
+
+Thus a research question is whether the price of oil has an impact on the average consumer. 
+
+## Scope of Analysis
+
+There isn't a single metric to define "average consumer" but the author used the following as proxies. Oil is used for transportation fuels, fertilizer/agriculture/feed and plastic products, changes in oil prices could manifest in these metrics. One way to measure this is to compare oil prices to a price index, which is the measure of the changes of a basket of goods. The following metrics were used
+
+1. **Food Consumer Price Index:** Prince index covering food/groceries--since oil is used to grow plants and feed animals, there could be an impact on input costs to what we eat. 
+
+2. **Disposable Income:** Index for how much money consumers have extra to spend--if oil is a burden/boon to consumer, this could reflect a gain/tax on consumers. 
+
+3. **Transportation Price Index:** Price index on fuel/public transportation cost: since oil is used as transportation fuel, there could be a relationship.
+
+## Data Sources 
+
+These datasets are compiled by the Federal Reserve Economic Department (FRED) which houses data on it's [website](https://fred.stlouisfed.org/), and has an API for query, which connection via Quandl. 
+
+
+## Initial Data Acquistion
+
+The four distinct data sets, cpi, income, food and transport were populated via an API call to FRED via Quandl.
+
+```{r}
+income <-Quandl("FRED/DSPI",type='zoo',api_key=key)
+food=Quandl("FRED/PPIFDF",type='zoo',api_key=key)
+transport=Quandl("FRED/CPIETRANS",type='zoo',api_key=key)
+```
+
+## Data Cleaning/Initial Exploratory Data Analysis
+
+Resampling all the data to make sure they are in the same timeframe and cleaning via our helper. 
+
+```{r}
+food <-to.monthly(food)
+food <-cleaner(food,'food')
+income <-to.monthly(income)
+income <-cleaner(income,'income')
+transport <-to.monthly(transport)
+transport <-cleaner(transport,'transport')
+```
+
+Finally merging all the data sets, including crude oil, and trimming NA values
+
+```{r}
+consumer <-merge(food,income)
+consumer <-merge(consumer,transport)
+consumer<-merge(consumer,crude)
+consumer <-na.trim(consumer)
+nrow(consumer)
+```
+
+Finally plotting the entire metrics along with Oil
+
+```{r}
+ plot.zoo(consumer,main='Consumer Metrics vs Oil',xlab='Time')
+```
+
+Looking at the familar oil subplot, there is once again the two distinct regions--"expensive oil" from 2010 to 2015 and then "cheap" oil from 2015 onward. 
+
+Splitting up the dataset into cheap and expensive crude, as previously [1-60 index] and [70-end]
+
+```{r}
+lowconsumer<-consumer[1:60]
+highconsumer <-consumer[70:124]
+```
+
+Replotting these regimes
+
+```{r}
+par(mfrow=c(1,2))
+plot.zoo(lowconsumer)
+plot.zoo(highconsumer)
+```
+
+## Low Oil Prices Analysis 
+
+With regimes split the Spearman hypothesis test can be set up with to test correlations.
+
+```{r}
+cor.test(as.vector(lowconsumer$oil),as.vector(lowconsumer$food),alternative = c('two.sided'),method=c('spearman'),exact = F)
+cor.test(as.vector(lowconsumer$oil),as.vector(lowconsumer$transport),alternative = c('two.sided'),method=c('spearman'),exact = F)
+cor.test(as.vector(lowconsumer$oil),as.vector(lowconsumer$income),alternative = c('two.sided'),method=c('spearman'),exact = F)
+```
+
+### Trends
+
+From the hypothesis testing rho values and checking p values (to see if less than .05) for statistically significance
+
+1. **Food:** A statisically significant 0.39--indicating a somewhat positive relationship
+2. **Transport** A statisically significant 0.646--indicating a stronger positive relationship
+2. **Disposable** A statisically significant 0.38--indicating a somewhat positive relationship
+
+.
+
+## High Oil Prices Analysis 
+
+Looking at high oil price regime 
+
+```{r}
+cor.test(as.vector(highconsumer$oil),as.vector(highconsumer$food),alternative = c('two.sided'),method=c('spearman'),exact = F)
+cor.test(as.vector(highconsumer$oil),as.vector(highconsumer$transport),alternative = c('two.sided'),method=c('spearman'),exact = F)
+cor.test(as.vector(highconsumer$oil),as.vector(highconsumer$income),alternative = c('two.sided'),method=c('spearman'),exact = F)
+```
+
+### Trends
+
+1. **Food:** Unable to establish statistical significane (p>0.05) and therefore no relationship
+2. **Transport** A statisically significant 0.84--indicating a very strong positive relationship
+2. **Disposable** A statisically significant 0.607--indicating a somewhat positive relationship
+
+## Correlation Matrix
+
+A side by side comparison of the correlation matrix (blue hues being positive, red being negative) reveal how the varaibles are all related.
+
+One technique to use side by side plots is the par() function which sets up a grip for plots based on vector passed--in this case a 1 X 2 canvas. 
+
+
+```{r}
+par(mfrow=c(1,2))
+corrplot(cor(highconsumer, method = c("spearman")),title="High Oil Consumer Impact",mar=c(0,1,2,1))
+corrplot(cor(lowconsumer, method = c("spearman")),title='Low Oil Case Consumer Impact',mar=c(0,1,2,1))
+```
+
+## Conclusion
+
+Reviewing the statistical analysis gave interesting results:
+
+1. **The price of of food rises with high oil prices but has no correlation during low oil prices.**
+
+This is particularly interesting showing that under a certain threshold, high oil prices as possible inputs for fertilizer/fuel make their way into food prices. However there is a floor to this effect as as oil prices decreases, there is no relationship. 
+
+2. **The price of transportation correlates with oil prices in both regimes, but is strongest during low oil regimes.**
+
+This makes sense given that oil is an input for all transportation vehicles but it seems that during the low price regimes, savings are passed on to the consumer. From experience most transportation tack on fuel surcharges to guess-timate their fuel costs, which might overshoot true cost. Once oil prices reach a threshold, those fuel surchages might be rescinded, and it benefits the consumers more. 
+
+3. **Consumers have a higher disposable income correlation in low oil price regimes than in high price regime.**
+
+This result could be due to higher oil prices means higher prices for transport/food, as mentioned above--but in a low oil environment it's hard to make a case.
+
+# State Based Impact Analysis:
+
+While it's no suprise that Saudi Arabia, Russia and Nigeria are among global oil producing countries, previous analysis has shown that the United States has emerged as a signfiicant producer of oil. Naturaly the US is far more diversed in economies than OPEC+ countries, that rely primarily on oil revenue, however there are still states that have significant exposure to the oil markets. This portion will attempt to find relationships between 'oil states" and how the commodity influences their economies. 
+
+The EIA provides the following graph on breakdown for oil.
+
+![](https://github.com/shahneilp/DATA607/raw/master/Final%20Project/state.png)
+
+From the graphic it's easy to see that Texas dominates the oil production, followed by North Dakota. 
+
+## Scope of Analysis
+
+Economists use job and labor statistics to help evaluate relations between markets and broader state economies..  A similar analysis will be used to evaluate oil prices impact on Texas and North Dakota based on the following metrics.
+
+
+1. **Unemployment Rate:** Percentage of labor that isn't actively employed, a wide proxy for economy state
+
+2. **Non-farm Employees:** Number of state residents working--higher number implies for economic activity
+
+3. **Mining Employees:** Oil & Gas is classified under Mining (see below) and can serve as a control
+
+
+## Data Sources 
+
+One rich source of data is the BLS that classifies all industries and collect information on wages, and employment. These datasets are compiled by the Bureau of Labor and Statistics (BLS) which houses data on it's [website](https://www.bls.gov/), and has an API for query, which connection via Quandl. 
+
+
+## Initial Data Acquistion
+
+Similar above an API call is created to populate dataframes for North Dakota and Texas--and separated. 
+
+```{r}
+NDunemployment=Quandl("BLSE/LAUST380000000000003",type='zoo',api_key=key)
+NDfarm=Quandl("BLSE/SMU38000000000000001",type='zoo',api_key=key)
+NDoil=Quandl("BLSE/SMS38000001000000001",type='zoo',api_key=key)
+
+TXunemployment=Quandl("BLSE/LAUST480000000000003",type='zoo',api_key=key)
+TXfarm=Quandl("BLSE/SMS48000000000000001",type='zoo',api_key=key)
+TXoil=Quandl("BLSE/SMS48000001000000001",type='zoo',api_key=key)
+```
+
+## Data Cleaning/Initial Exploratory Data Analysis
+
+Dataframe is munged and cleaned, and combined with oil and separated by regime.
+
+```{r}
+NDunemployment<-to.monthly(NDunemployment)
+NDunemployment <-cleaner(NDunemployment,'NDunemployment')
+NDfarm<-to.monthly(NDfarm)
+NDfarm <-cleaner(NDfarm,'NDfarm')
+NDoil<-to.monthly(NDoil)
+NDoil <-cleaner(NDoil,'NDoil')
+
+TXunemployment<-to.monthly(TXunemployment)
+TXunemployment <-cleaner(TXunemployment,'TXunemployment')
+TXfarm<-to.monthly(TXfarm)
+TXfarm <-cleaner(TXfarm,'TXfarm')
+TXoil<-to.monthly(TXoil)
+TXoil <-cleaner(TXoil,'TXoil')
+
+ND <-merge(NDunemployment,NDfarm)
+ND <-merge(ND,NDoil)
+ND<-merge(ND,crude)
+ND <-na.trim(ND)
+
+TX <-merge(TXunemployment,TXfarm)
+TX <-merge(TX,TXoil)
+TX<-merge(TX,crude)
+TX <-na.trim(TX)
+
+lowTX<-TX[1:60]
+highTX <-TX[70:120]
+lowND<-ND[1:60]
+highND <-ND[70:120]
+```
+
+Now the Texas Results
+
+```{r}
+par(mfrow=c(1,2))
+plot.zoo(lowTX)
+plot.zoo(highTX)
+```
+
+And North Dakota
+
+```{r}
+par(mfrow=c(1,2))
+plot.zoo(lowND)
+plot.zoo(highND)
+```
+
+## Side by Side Correlation Matrix Comparison 
+
+A challenge I faced was that by increasing my variables by two, it increased the workflow process significantly; for brevity correlation matrices are only generated. 
+
+Now re-creating the same correlation matrices but this time show casing full--and focusing on the oil row. 
+
+```{r}
+par(mfrow=c(1,2))
+corrplot(cor(highTX, method = c("spearman")),title="High Oil Texas Impact",mar=c(0,1,2,1))
+corrplot(cor(lowTX, method = c("spearman")),title='Low Oil Texasr Impact',mar=c(0,1,2,1))
+par(mfrow=c(1,2))
+corrplot(cor(highND, method = c("spearman")),title="High Oil North Dakota Impact",mar=c(0,1,2,1))
+corrplot(cor(lowND, method = c("spearman")),title='Low Oil North Dakota Impact',mar=c(0,1,2,1))
+```
+
+
+## State Impact: Conclusions
+
+### Texas: 
+
+1. Higher Oil prices actually have a negative correlation with unemployment rate, and positively correlated with oil and gas jobs, and total jobs. This isn't suprising as it implies that higher oil prices means more jobs overall for Texas and less unemployment, which aligns with Texas being the most prolific oil producer, especially when prices are booming. 
+
+2. Low oil prices had little relationship with unemployment rate,  and was weakly positive with total-jobs, and oil & gas jobs. Oil & gas jobs had the highest correlation albeit positive and weak, which makes sense as prices rise so will oil jobs. What's interesting is low oil prices had no overall impact on the unemployment rate--signifying that Texas's economy is much more diverse than just oil & gas, and that depression in prices doesn't always depress the overall economy. 
+
+### North Dakota:
+
+1. High oil prices had a weaker and negative correlation with unemployment rates, NO impact on total jobs  and strong positive relationship with oil & gas jobs. 
+
+2. Low oil prices had a weaker and negative correlation with unemployment rates, and were slighhlt positive correlated with total jobs and oil jobs.
+
+Comparing both states, overall Texas is better positioned to take advantage of higher oil prices and grow it's economy, probably due to the larger population and size of the state--this is evident in the stronger correlation of total jobs/oil jobs during high oil prices in Texas, than North Dakota. Furthermore Texas is shielded from low oil prices as the there is less negative relationship with unemployment rate in low oil prices, than North Dakota.
+
+While Texas is the oil king on the throne, it doesn't solely rely on it despite it's production status.
+
+# City Based Impact Analysis:
+
+Finally to drill down into the most micro-scale economy, it would be interesting to see how local cities are impact by the price of oil. Specifically comparing the economies of Midland, TX, deep in West Texas oil patch and Houston, TX the largest city in Texas.
+
+## Scope of Analysis
+
+Similar to the previous section, unemployment rates for Midland, TX and Houston, TX will be compared to the two regimes of oil prices.
+
+## Data Sources
+
+Unemployment rates are available via FRED but there is no API call--thus the .csv files were loaded onto the project [GitHub](https://github.com/shahneilp/DATA607/tree/master/Final%20Project).
+
+## Data Acquisiton 
+
+CSVs were loaded and then converted to ZOO format. 
+
+```{r}
+midland=read.csv.zoo('https://raw.githubusercontent.com/shahneilp/DATA607/master/Final%20Project/midland.csv')
+houston=read.csv.zoo('https://raw.githubusercontent.com/shahneilp/DATA607/master/Final%20Project/houston.csv')
+```
+
+## Initial Data Acquistion
+
+Once again the data was munged, resampled, merged with the crude oil pricing, and split into high/low oil price regimes.
+
+```{r}
+midland <-to.monthly(midland)
+houston <-to.monthly(houston)
+midland <-cleaner(midland,'midland')
+houston <-cleaner(houston,'houston')
+cities<-merge(houston,crude)
+cities<-merge(cities,midland)
+cities<-na.trim(cities)
+plot.zoo(cities,main='Plot Texas Cities vs Oil',xlab='Time')
+```
+
+Finally separating them into regimes.
+
+```{r}
+lowcities<-cities[1:60]
+highcities<-cities[65:124]
+```
+
+## Statistical Testing Analysis 
+
+```{r}
+cor.test(as.vector(highcities$oil),as.vector(highcities$midland),alternative = c('two.sided'),method=c('spearman'),exact = F)
+cor.test(as.vector(highcities$oil),as.vector(highcities$houston),alternative = c('two.sided'),method=c('spearman'),exact = F)
+
+cor.test(as.vector(lowcities$oil),as.vector(lowcities$midland),alternative = c('two.sided'),method=c('spearman'),exact = F)
+cor.test(as.vector(lowcities$oil),as.vector(lowcities$houston),alternative = c('two.sided'),method=c('spearman'),exact = F)
+
+```
+
+## Correlation Matrix Comparison
+
+```{r}
+par(mfrow=c(1,2))
+corrplot(cor(highcities, method = c("spearman")),title="High Oil vs TX Cities",mar=c(0,1,2,1))
+corrplot(cor(lowcities, method = c("spearman")),title='Low Oil vs TX Cities',mar=c(0,1,2,1))
+```
+
+## Conclusion
+
+### Midland
+
+Midland had statistically significant negative correlations in both cases -0.41 for low oil, -0.69 for high oil--the negative sign makes sense given that as oil prices go up, unemployment rate goes down; however the stronger negative for high oil prices indicate more sensitivity.
+
+### Houston
+
+Houston too was stastitically significant negative correlation--with -0.39 for low oil and -0.53; once again Texas being oil centric (from the previous section) the sign makes sense, and that higher oil prices have a bigger impact on brining more people to work.
+
+
+Overall this analysis points to Midland being more sensitive to oil prices than Houston, given more negative correlation coefficients in both cases. This isn't suprising given that 
+
+1. Houston is a large multi-economic city
+2. Midland is primarily in oil region of Texas, and hence the economy is more impacted by the industry. 
+
+
+# Overall Conclusion
+
+This analysis has sought to answer the role of oil in the broader US economy and it's importance by factoring in low/high prices.
+
+Overall:
+
+1. The broader consumer is penalized by higher oil prices but there is a marginal benefit in a fall of low oil prices, at the expense of oil focused states/cities.
+
+2. Specialized economies that focus on oil disproportionately are impacted by oil prices and research suggest that diversification helps blunt the economic impact of low prices. 
+
+This research helps point that there is a natural sweet spot for oil prices between 50-60$ in which the consumer benefits yet oil producing economies are not impacted severely--it is no suprise that this number is the common profit goal for domestic producers. 
+
+
+## Future Work Suggestion
+ 
+1. Different Oil Contracts Analysis: The use of different futures contracts by time and location could identify locational nuances and which factors are more sensitive to duration
+
+2. Predictive Modeling: Given that correlation is establishd here, a multfactor model can be developed to try to predict price/metric based on factors
+
+3. Advanced Metrics: If models are built, recall R^2 isn't the basis for comparison a more robust statistical like RMSE is appropriate. 
+
+
+# References
+
+1. [Energy Information Administration](https://www.eia.gov/)
+2. [Quandl Docs](https://docs.quandl.com/)
+3. [STDHA Correlation](http://www.sthda.com/english/wiki/correlation-matrix-an-r-function-to-do-all-you-need)
+4. [Zoo Docs](https://www.rdocumentation.org/packages/zoo/versions/1.8-7/topics/zoo)
+5. [Summary Statistics](http://biometry.github.io/APES/Stats/stats03-summaryStatistisc.html)
+
